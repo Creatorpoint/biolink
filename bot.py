@@ -96,16 +96,7 @@ async def start(_, message):
     await save_user(user_id)
 
     text = """
-✨ Premium Broadcast Bot Active ✨
-
-👮 Features:
-• Broadcast Messages
-• Premium Emoji Support
-• Photo Broadcast
-• Video Broadcast
-• Sticker Broadcast
-• Animation Broadcast
-• Auto User Save
+    Hey 👋 Welcome 🤗 I'm Airaa 😊
 
 🤖 Developed By Prime
 """
