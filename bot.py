@@ -1,10 +1,26 @@
-# bot.py
-
 import os
 import re
+from threading import Thread
+from flask import Flask
 from pyrogram import Client, filters
 from pyrogram.types import ChatPermissions
 from dotenv import load_dotenv
+
+# =========================
+# FLASK WEB SERVER
+# =========================
+
+web_app = Flask(__name__)
+
+@web_app.route("/")
+def home():
+    return "✅ Bio Guard Bot Running Successfully"
+
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    web_app.run(host="0.0.0.0", port=port)
+
+Thread(target=run_web).start()
 
 # =========================
 # LOAD ENV
@@ -55,7 +71,7 @@ async def is_admin(client, chat_id, user_id):
 @app.on_message(filters.command("start"))
 async def start(_, message):
 
-    text = f"""
+    text = """
 ✅ Advanced Bio Guard Bot Active
 
 👮 Features:
@@ -66,7 +82,7 @@ async def start(_, message):
 • Admin Commands
 • User ID Finder
 
-🤖 Developed By: Prime
+🤖 Developed By: @PREMGUPTA2M
 """
 
     await message.reply_text(text)
@@ -259,13 +275,11 @@ async def bio_checker(client, message):
 
         if re.search(LINK_REGEX, bio, re.IGNORECASE):
 
-            # Delete message
             try:
                 await message.delete()
             except:
                 pass
 
-            # Mute user
             try:
                 await client.restrict_chat_member(
                     message.chat.id,
@@ -275,7 +289,6 @@ async def bio_checker(client, message):
             except:
                 pass
 
-            # Warning message
             await message.chat.send_message(
                 f"🚫 {user.mention}\n\n"
                 f"bkl pehle link remove kr bio se 😹"
@@ -315,13 +328,9 @@ async def username_tracker(_, message):
         old_usernames[user.id] = current_username
 
 # =========================
-# BOT ONLINE LOG
+# START BOT
 # =========================
 
 print("✅ Bio Guard Bot Started Successfully")
-
-# =========================
-# RUN BOT
-# =========================
 
 app.run()
