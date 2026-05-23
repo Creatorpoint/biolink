@@ -24,7 +24,7 @@ web_app = Flask(__name__)
 
 @web_app.route("/")
 def home():
-    return "✅ Premium Broadcast Bot Running"
+    return "✅ Advanced Broadcast Bot Running"
 
 def run_web():
     port = int(os.environ.get("PORT", 10000))
@@ -37,7 +37,7 @@ Thread(target=run_web).start()
 # ==========================================
 
 db = sqlite3.connect(
-    "users.db",
+    "broadcast.db",
     check_same_thread=False
 )
 
@@ -49,6 +49,12 @@ CREATE TABLE IF NOT EXISTS users (
 )
 """)
 
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS groups (
+    group_id INTEGER PRIMARY KEY
+)
+""")
+
 db.commit()
 
 # ==========================================
@@ -56,7 +62,7 @@ db.commit()
 # ==========================================
 
 app = Client(
-    "PremiumBroadcastBot",
+    "AdvancedBroadcastBot",
     api_id=API_ID,
     api_hash=API_HASH,
     bot_token=BOT_TOKEN
@@ -85,50 +91,60 @@ async def save_user(user_id):
         db.commit()
 
 # ==========================================
+# SAVE GROUP
+# ==========================================
+
+async def save_group(group_id):
+
+    cursor.execute(
+        "SELECT * FROM groups WHERE group_id=?",
+        (group_id,)
+    )
+
+    data = cursor.fetchone()
+
+    if data is None:
+
+        cursor.execute(
+            "INSERT INTO groups VALUES (?)",
+            (group_id,)
+        )
+
+        db.commit()
+
+# ==========================================
 # START COMMAND
 # ==========================================
 
 @app.on_message(filters.command("start"))
 async def start(_, message):
 
-    user_id = message.from_user.id
-
-    await save_user(user_id)
+    await save_user(message.from_user.id)
 
     text = """
-    Hey 👋 Welcome 🤗 I'm Airaa 😊
-
+✨hey welcome 🤗 I'm AIRAA 🎀
 🤖 Developed By Prime
 """
 
     await message.reply_text(text)
 
 # ==========================================
-# HELP COMMAND
+# SAVE GROUPS
 # ==========================================
 
-@app.on_message(filters.command("help"))
-async def help_cmd(_, message):
+@app.on_message(filters.group)
+async def group_save(_, message):
 
-    text = """
-📚 Broadcast Guide
+    await save_group(message.chat.id)
 
-1. Send any message
-2. Reply to that message
-3. Use:
+# ==========================================
+# SAVE USERS
+# ==========================================
 
-/broadcast
+@app.on_message(filters.private)
+async def private_save(_, message):
 
-✅ Supports:
-• Premium Emojis
-• Photos
-• Videos
-• Stickers
-• GIFs
-• Text
-"""
-
-    await message.reply_text(text)
+    await save_user(message.from_user.id)
 
 # ==========================================
 # USER COUNT
@@ -144,8 +160,13 @@ async def users_count(_, message):
         "SELECT COUNT(*) FROM users"
     ).fetchone()[0]
 
+    groups = cursor.execute(
+        "SELECT COUNT(*) FROM groups"
+    ).fetchone()[0]
+
     await message.reply_text(
-        f"👥 Total Users: {total}"
+        f"👥 Users: {total}\n"
+        f"👨‍👩‍👦 Groups: {groups}"
     )
 
 # ==========================================
@@ -158,37 +179,57 @@ async def broadcast(client, message):
     if message.from_user.id != OWNER_ID:
 
         return await message.reply_text(
-            "Papa Ko bhej BKL 😂"
+            "YE KAAM PRIME PAPA SE HOGA BCHA 😂"
         )
 
     if not message.reply_to_message:
 
         return await message.reply_text(
-            "⚠️ Reply to any message for broadcast"
+            "⚠️ Reply to message for broadcast"
         )
 
     users = cursor.execute(
         "SELECT user_id FROM users"
     ).fetchall()
 
-    total = 0
+    groups = cursor.execute(
+        "SELECT group_id FROM groups"
+    ).fetchall()
+
+    success = 0
     failed = 0
 
     status = await message.reply_text(
         "📢 Broadcasting Started..."
     )
 
+    # USERS
     for user in users:
-
-        user_id = user[0]
 
         try:
 
             await message.reply_to_message.copy(
-                user_id
+                user[0]
             )
 
-            total += 1
+            success += 1
+
+        except Exception as e:
+
+            print(e)
+
+            failed += 1
+
+    # GROUPS
+    for group in groups:
+
+        try:
+
+            await message.reply_to_message.copy(
+                group[0]
+            )
+
+            success += 1
 
         except Exception as e:
 
@@ -198,26 +239,92 @@ async def broadcast(client, message):
 
     await status.edit_text(
         f"✅ Broadcast Completed\n\n"
-        f"👥 Success: {total}\n"
+        f"✅ Success: {success}\n"
         f"❌ Failed: {failed}"
     )
 
 # ==========================================
-# AUTO SAVE USERS
+# FORWARD USER REPLIES TO OWNER
 # ==========================================
 
-@app.on_message(filters.private)
-async def auto_save(_, message):
+@app.on_message(filters.private & ~filters.command([
+    "start",
+    "broadcast",
+    "users"
+]))
+async def forward_to_owner(client, message):
 
-    user_id = message.from_user.id
+    if message.from_user.id == OWNER_ID:
+        return
 
-    await save_user(user_id)
+    user = message.from_user
+
+    caption = (
+        f"📩 New User Reply\n\n"
+        f"👤 Name: {user.first_name}\n"
+        f"🆔 ID: {user.id}\n"
+        f"📛 Username: @{user.username}"
+    )
+
+    try:
+
+        forwarded = await message.forward(
+            OWNER_ID
+        )
+
+        await forwarded.reply_text(caption)
+
+    except Exception as e:
+
+        print(e)
 
 # ==========================================
-# BOT ONLINE LOG
+# OWNER REPLY SYSTEM
 # ==========================================
 
-print("✅ Premium Broadcast Bot Started")
+@app.on_message(filters.private & filters.reply)
+async def owner_reply(client, message):
+
+    if message.from_user.id != OWNER_ID:
+        return
+
+    try:
+
+        replied = message.reply_to_message
+
+        if not replied.forward_from:
+            return
+
+        target_id = replied.forward_from.id
+
+        if message.text:
+
+            await client.send_message(
+                target_id,
+                f"📩 Owner Reply:\n\n{message.text}"
+            )
+
+        elif message.photo:
+            await message.copy(target_id)
+
+        elif message.video:
+            await message.copy(target_id)
+
+        elif message.sticker:
+            await message.copy(target_id)
+
+        elif message.document:
+            await message.copy(target_id)
+
+    except Exception as e:
+
+        print(e)
+
+# ==========================================
+# ONLINE LOG
+# ==========================================
+
+print("✅ Advanced Broadcast Bot Started")
 
 # ==========================================
 # RUN BOT
