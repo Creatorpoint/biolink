@@ -6,15 +6,15 @@ from pyrogram import Client, filters
 from pyrogram.types import ChatPermissions
 from dotenv import load_dotenv
 
-# =========================
-# FLASK WEB SERVER
-# =========================
+# ==========================================
+# WEB SERVER FOR RENDER
+# ==========================================
 
 web_app = Flask(__name__)
 
 @web_app.route("/")
 def home():
-    return "✅ Bio Guard Bot Running Successfully"
+    return "✅ Bio Guard Bot Running"
 
 def run_web():
     port = int(os.environ.get("PORT", 10000))
@@ -22,9 +22,9 @@ def run_web():
 
 Thread(target=run_web).start()
 
-# =========================
+# ==========================================
 # LOAD ENV
-# =========================
+# ==========================================
 
 load_dotenv()
 
@@ -33,9 +33,9 @@ API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 OWNER_ID = int(os.getenv("OWNER_ID"))
 
-# =========================
+# ==========================================
 # BOT CLIENT
-# =========================
+# ==========================================
 
 app = Client(
     "BioGuardBot",
@@ -44,29 +44,37 @@ app = Client(
     bot_token=BOT_TOKEN
 )
 
-# =========================
-# LINK DETECTOR
-# =========================
+# ==========================================
+# LINK REGEX
+# ==========================================
 
-LINK_REGEX = r"(https?://|t\.me/|telegram\.me/|www\.|\.com|\.net|\.in|@)"
+LINK_REGEX = r"(https?://\S+|t\.me/\S+|telegram\.me/\S+|www\.\S+|@\w+|\.com|\.net|\.in)"
 
-# =========================
-# MEMORY
-# =========================
+# ==========================================
+# USERNAME MEMORY
+# ==========================================
 
 old_usernames = {}
 
-# =========================
+# ==========================================
 # ADMIN CHECK
-# =========================
+# ==========================================
 
 async def is_admin(client, chat_id, user_id):
-    member = await client.get_chat_member(chat_id, user_id)
-    return member.status in ["administrator", "owner"]
 
-# =========================
+    member = await client.get_chat_member(
+        chat_id,
+        user_id
+    )
+
+    return member.status in [
+        "administrator",
+        "owner"
+    ]
+
+# ==========================================
 # START COMMAND
-# =========================
+# ==========================================
 
 @app.on_message(filters.command("start"))
 async def start(_, message):
@@ -82,14 +90,14 @@ async def start(_, message):
 • Admin Commands
 • User ID Finder
 
-🤖 Developed By: @PREMGUPTA2M
+🤖 Developed By: PREM
 """
 
     await message.reply_text(text)
 
-# =========================
+# ==========================================
 # HELP COMMAND
-# =========================
+# ==========================================
 
 @app.on_message(filters.command("help"))
 async def help_cmd(_, message):
@@ -97,9 +105,9 @@ async def help_cmd(_, message):
     text = """
 📚 Commands List
 
-/start - Start bot
-/help - Help menu
-/id - Get user id
+/start - Start Bot
+/help - Help Menu
+/id - Get User ID
 
 Admin Commands:
 /mute
@@ -110,9 +118,9 @@ Admin Commands:
 
     await message.reply_text(text)
 
-# =========================
+# ==========================================
 # USER ID COMMAND
-# =========================
+# ==========================================
 
 @app.on_message(filters.command("id"))
 async def get_id(_, message):
@@ -124,20 +132,18 @@ async def get_id(_, message):
         f"🆔 User ID: `{user.id}`"
     )
 
-# =========================
+# ==========================================
 # MUTE COMMAND
-# =========================
+# ==========================================
 
 @app.on_message(filters.command("mute") & filters.group)
 async def mute_user(client, message):
 
-    admin = await is_admin(
+    if not await is_admin(
         client,
         message.chat.id,
         message.from_user.id
-    )
-
-    if not admin:
+    ):
         return await message.reply_text(
             "❌ You are not admin"
         )
@@ -149,30 +155,35 @@ async def mute_user(client, message):
 
     target = message.reply_to_message.from_user
 
-    await client.restrict_chat_member(
-        message.chat.id,
-        target.id,
-        ChatPermissions()
-    )
+    try:
 
-    await message.reply_text(
-        f"🔇 {target.mention} muted"
-    )
+        await client.restrict_chat_member(
+            chat_id=message.chat.id,
+            user_id=target.id,
+            permissions=ChatPermissions()
+        )
 
-# =========================
+        await message.reply_text(
+            f"🔇 {target.mention} muted"
+        )
+
+    except Exception as e:
+        await message.reply_text(
+            f"❌ Error:\n{e}"
+        )
+
+# ==========================================
 # UNMUTE COMMAND
-# =========================
+# ==========================================
 
 @app.on_message(filters.command("unmute") & filters.group)
 async def unmute_user(client, message):
 
-    admin = await is_admin(
+    if not await is_admin(
         client,
         message.chat.id,
         message.from_user.id
-    )
-
-    if not admin:
+    ):
         return
 
     if not message.reply_to_message:
@@ -182,29 +193,40 @@ async def unmute_user(client, message):
 
     target = message.reply_to_message.from_user
 
-    await client.unban_chat_member(
-        message.chat.id,
-        target.id
-    )
+    try:
 
-    await message.reply_text(
-        f"🔊 {target.mention} unmuted"
-    )
+        await client.restrict_chat_member(
+            chat_id=message.chat.id,
+            user_id=target.id,
+            permissions=ChatPermissions(
+                can_send_messages=True,
+                can_send_media_messages=True,
+                can_send_other_messages=True,
+                can_add_web_page_previews=True
+            )
+        )
 
-# =========================
+        await message.reply_text(
+            f"🔊 {target.mention} unmuted"
+        )
+
+    except Exception as e:
+        await message.reply_text(
+            f"❌ Error:\n{e}"
+        )
+
+# ==========================================
 # BAN COMMAND
-# =========================
+# ==========================================
 
 @app.on_message(filters.command("ban") & filters.group)
 async def ban_user(client, message):
 
-    admin = await is_admin(
+    if not await is_admin(
         client,
         message.chat.id,
         message.from_user.id
-    )
-
-    if not admin:
+    ):
         return
 
     if not message.reply_to_message:
@@ -214,29 +236,34 @@ async def ban_user(client, message):
 
     target = message.reply_to_message.from_user
 
-    await client.ban_chat_member(
-        message.chat.id,
-        target.id
-    )
+    try:
 
-    await message.reply_text(
-        f"🚫 {target.mention} banned"
-    )
+        await client.ban_chat_member(
+            message.chat.id,
+            target.id
+        )
 
-# =========================
+        await message.reply_text(
+            f"🚫 {target.mention} banned"
+        )
+
+    except Exception as e:
+        await message.reply_text(
+            f"❌ Error:\n{e}"
+        )
+
+# ==========================================
 # UNBAN COMMAND
-# =========================
+# ==========================================
 
 @app.on_message(filters.command("unban") & filters.group)
 async def unban_user(client, message):
 
-    admin = await is_admin(
+    if not await is_admin(
         client,
         message.chat.id,
         message.from_user.id
-    )
-
-    if not admin:
+    ):
         return
 
     if not message.reply_to_message:
@@ -246,20 +273,27 @@ async def unban_user(client, message):
 
     target = message.reply_to_message.from_user
 
-    await client.unban_chat_member(
-        message.chat.id,
-        target.id
-    )
+    try:
 
-    await message.reply_text(
-        f"✅ {target.mention} unbanned"
-    )
+        await client.unban_chat_member(
+            message.chat.id,
+            target.id
+        )
 
-# =========================
+        await message.reply_text(
+            f"✅ {target.mention} unbanned"
+        )
+
+    except Exception as e:
+        await message.reply_text(
+            f"❌ Error:\n{e}"
+        )
+
+# ==========================================
 # BIO LINK CHECKER
-# =========================
+# ==========================================
 
-@app.on_message(filters.group & filters.text)
+@app.on_message(filters.group)
 async def bio_checker(client, message):
 
     user = message.from_user
@@ -267,42 +301,69 @@ async def bio_checker(client, message):
     if not user:
         return
 
+    if user.is_bot:
+        return
+
     try:
 
-        full_user = await client.get_users(user.id)
+        member = await client.get_chat_member(
+            message.chat.id,
+            user.id
+        )
+
+        # Ignore admins
+        if member.status in [
+            "administrator",
+            "owner"
+        ]:
+            return
+
+        full_user = await client.get_users(
+            user.id
+        )
 
         bio = full_user.bio or ""
 
-        if re.search(LINK_REGEX, bio, re.IGNORECASE):
+        print(f"{user.first_name} BIO => {bio}")
 
+        if re.search(
+            LINK_REGEX,
+            bio,
+            re.IGNORECASE
+        ):
+
+            # Delete message
             try:
                 await message.delete()
-            except:
-                pass
+            except Exception as e:
+                print("DELETE ERROR:", e)
 
+            # Mute user
             try:
                 await client.restrict_chat_member(
-                    message.chat.id,
-                    user.id,
-                    ChatPermissions()
+                    chat_id=message.chat.id,
+                    user_id=user.id,
+                    permissions=ChatPermissions()
                 )
-            except:
-                pass
+            except Exception as e:
+                print("MUTE ERROR:", e)
 
-            await message.chat.send_message(
+            # Send warning
+            await client.send_message(
+                message.chat.id,
                 f"🚫 {user.mention}\n\n"
                 f"bkl pehle link remove kr bio se 😹"
             )
 
     except Exception as e:
-        print(e)
+        print("BIO ERROR:", e)
 
-# =========================
+# ==========================================
 # USERNAME CHANGE DETECTOR
-# =========================
+# ==========================================
 
 @app.on_message(filters.group)
-async def username_tracker(_, message):
+async def username_tracker(client, message):
 
     user = message.from_user
 
@@ -312,6 +373,7 @@ async def username_tracker(_, message):
     current_username = user.username
 
     if user.id not in old_usernames:
+
         old_usernames[user.id] = current_username
         return
 
@@ -319,7 +381,8 @@ async def username_tracker(_, message):
 
     if old_username != current_username:
 
-        await message.chat.send_message(
+        await client.send_message(
+            message.chat.id,
             f"⚠️ {user.mention} changed username\n\n"
             f"Old Username: @{old_username}\n"
             f"New Username: @{current_username}"
@@ -327,10 +390,14 @@ async def username_tracker(_, message):
 
         old_usernames[user.id] = current_username
 
-# =========================
-# START BOT
-# =========================
+# ==========================================
+# ONLINE LOG
+# ==========================================
 
 print("✅ Bio Guard Bot Started Successfully")
+
+# ==========================================
+# RUN BOT
+# ==========================================
 
 app.run()
